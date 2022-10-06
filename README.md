@@ -9,13 +9,13 @@
 
 Since its humble beginnings in the 70s as specialised hardware such as _Pong™_, video game programming has matured into an integrated and accessible practice; modern developers can now realise an entire project without having to write a single line of code and, even if one does, one hardly ever has to worry about the behaviour that modern libraries such as OpenGL and Metal abstracts away.
 
-Towards gaining a reinforced command of computer architecture, a low-level programming, and a general awareness of game development practices. 6502’s architecture, its instruction set, memory map, TIA scanline rendering, controller input, subroutines, object collision
+The following lecture will cover the three basic game design principles of animation, "physics", and controller input through the lens of an assembly language with only three 16-bit registers and a memory allowance of only 40 kilobytes. Students will thus gain a reinforced command of computer architecture, low-level programming, and a general awareness of game development practices.
 
 ### **Topics**
 
-- **Polymorphism**: the inheritance perspective
-- **Polymorphism**: the interface perspective
-- **Polymorphism in Action**: a multi-threaded heist
+- **Simple Animation**: Sprite Movement
+- **Physics**: Storing and Loading States
+- **Controller Input**: Bitwise Operations
 
 ### **Pre-Requisites**
 

@@ -1,6 +1,6 @@
 <h2 align=center>October 13th, 2022</h2>
 
-<h1 align=center><a src="LECTURE_NOTES.md"><em>Nintendo Entertainment System</em>: Game Programming in Assembly</a></h1>
+<h1 align=center><em>Nintendo Entertainment System</em>: Game Programming in Assembly</h1>
 
 <h3 align=center>Sebastián Romero Cruz</h3>
 <p align=center><sup><em>(they / them)</em></sup></p>
@@ -17,6 +17,8 @@ The following lecture will cover the three basic game design principles of anima
 2. **Simple Animation**: Sprite Movement
 3. **Physics**: Storing and Loading States
 4. **Controller Input**: Bitwise Operations
+
+<sub>[***Lecture Notes***](LECTURE_NOTES.md)</sub>
 
 ### **Pre-Requisites**
 

@@ -2,7 +2,9 @@
 
 <h1 align=center>Game Programming in Assembly</h1>
 
-<h3 align=center>NYU Tandon School of Engineering</h3>
+### 21 Vendémiaire Year CCXXXI
+
+***Song of the day***: _[**Life During Wartime**](https://youtu.be/jLwZvg46jms) by Talking Heads (2022)._
 
 ### Sections
 

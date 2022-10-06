@@ -37,6 +37,10 @@
 music               .rs 16
 backgroundLowByte   .rs 1
 backgroundHighByte  .rs 1
+noSkipFlag          .rs 1
+cassetteBounceFlag  .rs 1
+cassetteUpFlag      .rs 1
+paletteCycleCounter .rs 1
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reset                                                                                               ;;
@@ -65,6 +69,10 @@ RESET:
     STX DELMODADDR
 
     LDA #$00
+    STA noSkipFlag
+    STA cassetteUpFlag
+    STA cassetteBounceFlag
+    STA paletteCycleCounter  
     
     ;; Vertical blanks and memory clear (see macros.asm)
     CLEARMEM    
@@ -154,15 +162,284 @@ NMI:
     RTI
 
 ReadControllerInput:
-    ; TODO
+    ;; Activate controller
+    LDA #CTRL_1_PORT
+    STA CNTRLRONE
+    LDA #$00
+    STA CNTRLRONE
+
+ReadA:
+    ;; Check if A is being pressed
+    LDA CNTRLRONE
+    AND #BINARY_ONE
+    BEQ EndReadA
+
+    ;; To avoid very fast palette changes, only do this every other frame
+    LDA noSkipFlag
+    AND #BINARY_ONE
+    BEQ EndReadA
+
+    ;; Switch over to the next palette value (0-3)
+    CLC
+    LDA paletteCycleCounter
+    ADC #$01
+    STA paletteCycleCounter
+
+    ;; If we haven't reached 4, we can go manipulate the sprite attribute bits
+    CMP #PALETTE_LIM
+    BNE .Cycle
+
+    ;; But it we have reached 4, we should reset the counter to 0
+    LDA #$00
+    STA paletteCycleCounter
+
+.Cycle:
+    LDX #$00
+    LDY #$00
+.ALoop:
+    LDA CSSETTE_ATR,X
+    ORA #%00000011          ; turn on both palette bits —> XXXXXX11
+    EOR #%00000011          ; turn off both palette bits -> XXXXXX00
+    EOR paletteCycleCounter ; turn on the current palette (00, 01, 10, or 11)
+    STA CSSETTE_ATR,X
+
+.AInnerLoop:
+    INX
+    INY
+
+    CPY #CHAR_GAP
+    BNE .AInnerLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .ALoop
+
+EndReadA:
+
+    ;; Read button input: A -> B -> Select -> Start -> Up -> Down -> Left -> Right
+    LDA CNTRLRONE   ; B
+    LDA CNTRLRONE   ; Select
+    LDA CNTRLRONE   ; Start
+
+ReadUp:
+    LDA CNTRLRONE
+    AND #BINARY_ONE
+    BEQ EndReadUp
+
+    ;; Upper boundary, so that we don't overlap with text
+    STOPNEG CASSETTE_STRT, CASSETTE_YTOP, EndReadUp
+
+    LDX #$00
+    LDY #$00
+.UpLoop:
+    SEC
+    LDA CASSETTE_STRT,X
+    SBC #$01
+    STA CASSETTE_STRT,X
+
+.InnerUpLoop:
+    INY
+    INX
+    CPY #CHAR_GAP
+    BNE .InnerUpLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .UpLoop
+
+EndReadUp:
+
+ReadDown:
+    LDA CNTRLRONE
+    AND #BINARY_ONE
+    BEQ EndReadDown
+
+    STOPPOS CASSETTE_STRT, BORDER_DOWN, EndReadDown
+
+    LDX #$00
+    LDY #$00
+.DownLoop:
+    CLC
+    LDA CASSETTE_STRT,X
+    ADC #$01
+    STA CASSETTE_STRT,X
+
+.InnerDownLoop:
+    INY
+    INX
+    CPY #CHAR_GAP
+    BNE .InnerDownLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .DownLoop
+
+EndReadDown:
+
+ReadLeft:
+    LDA CNTRLRONE
+    AND #$01
+    BEQ EndReadLeft
+
+    STOPNEG CASSETTE_TILE, BRDR_UP_LFT, EndReadLeft
+
+    LDX #$00
+    LDY #$00
+.LeftLoop:
+    SEC
+    LDA CASSETTE_TILE,X
+    SBC #$01
+    STA CASSETTE_TILE,X
+
+.InnerLeftLoop: 
+    INX
+    INY
+    CPY #CHAR_GAP
+    BNE .InnerLeftLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .LeftLoop
+
+EndReadLeft
+
+ReadRight:
+    LDA CNTRLRONE
+    AND #$01
+    BEQ EndReadRight
+
+    STOPPOS CASSETTE_TILE, BORDER_RGHT, EndReadRight
+
+    LDX #$00
+    LDY #$00
+.RightLoop:
+    CLC
+    LDA CASSETTE_TILE,X
+    ADC #$01
+    STA CASSETTE_TILE,X
+
+.RightInnerLoop:
+    INX
+    INY
+    CPY #CHAR_GAP
+    BNE .RightInnerLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .RightLoop
+
+
+EndReadRight:
     RTS
 
 CassetteBounce:
-    ; TODO
+    ;; Only bounce every other frame
+    LDA noSkipFlag
+    CMP #BINARY_ONE
+    BNE .Skip
+
+    ;; Should we flip direction?
+    LDA cassetteBounceFlag
+    CMP #BNCE_ANIM_TMR
+    BEQ .FlipBounceDirection
+    BNE .Bounce
+
+.FlipBounceDirection:
+    ;; cassetteUpFlag = !cassetteUpFlag
+    NOT cassetteUpFlag
+    
+    ;; Restart the 0-5 animation timer
+    LDA #$00
+    STA cassetteBounceFlag
+
+.Bounce:
+    ;; Bounce either up or down depending on the value of cassetteUpFlag
+    LDA cassetteUpFlag
+    CMP #$00
+    BEQ .Up
+    BNE .Down
+
+    ;; UP-BOUNCE
+.Up:
+
+    ;; Upper boundary, so that we don't overlap with text
+    STOPNEG CASSETTE_STRT, CASSETTE_YTOP, .End
+
+    LDX #$00
+    LDY #$00
+.UpLoop:
+    SEC
+    LDA CASSETTE_STRT,X 
+    SBC #BINARY_ONE
+    STA CASSETTE_STRT,X
+
+.SpriteUpLoop:
+    INY
+    INX
+    CPY #CHAR_GAP
+    BNE .SpriteUpLoop
+    
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .UpLoop
+
+    JMP .End
+
+    ;; DOWN-BOUNCE
+.Down:
+    STOPPOS CASSETTE_STRT, BORDER_DOWN, .End
+
+    LDX #$00
+    LDY #$00
+.DownLoop:
+    CLC
+    LDA CASSETTE_STRT,X
+    ADC #BINARY_ONE
+    STA CASSETTE_STRT,X
+
+.SpriteDownLoop:
+    INY
+    INX
+    CPY #CHAR_GAP
+    BNE .SpriteDownLoop
+    
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .DownLoop
+
+    ;; END BOUNCE
+.End:
+    CLC
+    LDA cassetteBounceFlag
+    ADC #BINARY_ONE
+    STA cassetteBounceFlag
+
+.Skip:
     RTS
 
+;; Banner animation
 RotateText:
-    ; TODO
+    LDX #$00           ; x = 0
+    LDY #$00           ; y = 0
+.StringLoop:
+    LDA STRNG_STRT,X   ; load the location of (0th + x)th letter
+
+    CLC                ; clear the carry flag
+    ADC #$01           ; add 1 to the value stored in the acc (aka translate to the right by 1)
+    STA STRNG_STRT,X   ; store the incremented value the location of (0th + x)th memory location
+
+.CharacterLoop:
+    INX                ; x++ while y < 4
+    INY                ; y++ while y < 4
+
+    CPY #$04           ; once y == 4, stop CharacterLoop
+    BNE .CharacterLoop
+
+    LDY #$00           ; reset y to 0
+
+    CPX #STRNG_SIZE    ; once x == STRNG_SIZE, stop StringLoop
+    BNE .StringLoop
+
     RTS
 
 

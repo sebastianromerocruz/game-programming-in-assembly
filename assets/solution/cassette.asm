@@ -189,7 +189,7 @@ ReadA:
     CMP #PALETTE_LIM
     BNE .Cycle
 
-    ;; But it we have reached 4, we should reset the counter to 0
+    ;; But if we have reached 4, we should reset the counter to 0
     LDA #$00
     STA paletteCycleCounter
 

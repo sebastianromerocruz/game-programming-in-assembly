@@ -14,7 +14,11 @@
     2. [**Branching And Looping**](#branching-and-looping)
 3. [**Simple Animation**](#part-3-simple-animation)
 4. [**Controller Input**](#part-4-controller-input)
-5. [**Physics**](#part-5-physics)
+    1. [**Checking For An Active Bit**](#checking-for-an-active-bit)
+    2. [**Changing Colour Palettes**](#changing-colour-palettes)
+    3. [**Keeping Variables**](#keeping-variables)
+    4. [**Manipulating Specific Bits In A Byte**](#manipulating-specific-bits-in-a-byte)
+5. [**Conclusion**](#part-5-conclusion)
 
 ### Part 1: _Introduction_
 
@@ -79,7 +83,7 @@ LIMIT = $04     ; we can assign labels to addresses
     LDX #$00    ; x = 0
 Loop:
     INX  ; x++
-    CPX #LIMIT  : x == LIMIT
+    CPX #LIMIT  ; x == LIMIT
 
                 ; the code that we want to loop would go here
 
@@ -350,6 +354,8 @@ ReadControllerInput:
     LDA CNTRLRONE   ; Down
     LDA CNTRLRONE   ; Left
     LDA CNTRLRONE   ; Right
+
+    RTS
 ```
 
 <sub>**Code Block 8**: Loading either 1 or 0 from each of the button presses—although we are not actually down anything with the result.</sub>
@@ -364,11 +370,11 @@ The byte loaded from of `CNTRLRONE` either has a 1 at its most significant bit (
 CNTRLRONE  --> XXXXXXX0                | --> XXXXXXX1
                  AND                   |       AND
 BINARY_ONE --> 00000001                | --> 00000001
----------------------------------------|------------------------
+———————————————————————————————————————————————————————————————
 result     --> XXXXXXX0 (not pressed)  | --> XXXXXXX1 (pressed)
 ```
 
-<sub>**Figure 17**:  The two potential results of a bitwise `and` operation on `CNTRLRONE` and (1)<sub>2</sub>, where `X` represents in this case an irrelevant digit.</sub>
+<sub>**Figure 17**: The two potential results of a bitwise `and` operation on `CNTRLRONE` and (1)<sub>2</sub>, where `X` represents in this case an irrelevant digit.</sub>
 
 Let's handle moving to the right if the player presses the right button first, since we're already aquatinted with the basics of this operation:
 
@@ -535,8 +541,244 @@ EndReadLeft:
 
 <sub>**Code Block 11**: Translating upwards, downwards, and to the left _only if_ the their corresponding buttons are pressed. Notice that, in the case of subtraction, we have to _set_ the carry flag instead of clearing it.</sub>
 
-#### Changing Colour Palettes With `and`, `or` And `xor`
+#### Changing Colour Palettes
 
-Let's do something more interesting now. 
+Let's do something more interesting now. Remember the four bytes associated to each sprite? Let's take a look at the ones for the cassette "meta-sprite"
 
-### Part 5: _Physics_
+```asm
+    ;; Corners
+    .db $70, $08, %00000000, $70  ; upper left
+    .db $80, $08, %10000000, $70  ; lower left
+    .db $70, $08, %01000000, $88  ; upper right
+    .db $80, $08, %11000000, $88  ; lower right
+
+    ;; Middle vertical borders
+    .db $78, $09, %00000000, $70  ; left
+    .db $78, $09, %01000000, $88  ; right
+
+    ;; Middle horizontal borders
+    .db $70, $0A, %00000000, $78  ; upper left
+    .db $70, $0A, %01000000, $80  ; upper right
+    .db $80, $0A, %10000000, $78  ; lower left
+    .db $80, $0A, %11000000, $80  ; lower right
+
+    ;; Middle sections
+    .db $78, $0B, %00000000, $78  ; left
+    .db $78, $0B, %01000000, $80  ; right
+```
+
+<sub>**Code Block 12**: Data bank for the sprites that comprise our cassette meta-sprite.</sub>
+
+We spoke earlier about how, in the third byte, the two most significant (leftmost) bits correspond to the palette being used to colour the sprite. The 6502 allows for up to four palettes to be assigned to a particular sprite (i.e. `00` for palette 1, `01` for palette 2, `10` for palette 3, and `11` for palette 4). So, in code block 12, we can see that all sprites are currently using colour palette 1 (`00`).
+
+How about we try to do this: every time the player clicks on the A-button, the palette being applied to the player will rotate between the four available palettes. We can think of this is as a game mechanic; maybe every palette represents a different power-up our cassette protagonist can use. Fundamentally speaking, the frame of this process is the same as how we achieved movement: we load up the appropriate byte (`CSSETTE_ATR`, or `$0302`), perform the appropriate steps to change the palette, skip four bytes to reach the next sprite's attribute byte, and repeat the process for each of the sprites that comprise the cassette:
+
+```asm
+ReadA:
+    LDA CNTRLRONE
+    AND #%00000001
+    BEQ EndReadA
+
+    ; TODO - Switch over to the next palette value (0-3)
+
+.ALoop:
+    LDA CSSETTE_ATR,X
+
+    ; TODO - Change bits 1 and 2 from the current attribute byte
+
+    STA CSSETTE_ATR,X
+
+.AInnerLoop:
+    INX
+    INY
+
+    CPY #CHAR_GAP
+    BNE .AInnerLoop
+
+    LDY #$00
+    CPX #$04
+    BNE .ALoop
+
+EndReadA:
+```
+
+<sub>**Code Block 13**: Cycle through palettes 0 - 3 (i.e. `00` - `11`) and apply it to all the cassette sprites with a loop.</sub>
+
+#### ***Keeping Variables***
+
+What we would like to do first is to store, somewhere in memory, a value that tells us which palette to apply at any given time that the A button is pressed. That is, if palette 2 (`10`) is selected, `ReadA` should switch over to palette 3 (`11`). If A is pressed again, it should cycle back to 0 (`00`). In high-level programming languages, a "global" variable of sorts would be ideal for this job. Can we do something similar in 6502 assembly?
+
+Sure can. Close to the top of our `asm` file you will find a section where I am creating the variables necessary for this code to run the way it does at the moment:
+
+```asm
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Variables                                                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .rsset VARLOC
+music               .rs 16
+backgroundLowByte   .rs 1
+backgroundHighByte  .rs 1
+```
+
+<sub>**Code Block 14**: Here, I am basically telling the microprocessor that, starting at location `VARLOC`, I want 16 bytes reserved for my variable `music`, and 1 byte for both `backgroundLowByte` and `backgroundHighByte`, respectively.</sub>
+
+Let's add one more variable here to keep track of our current palette value, and initialise it to 0 (i.e. `00`):
+
+```asm
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Variables                                                                                           ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .rsset VARLOC
+music               .rs 16
+backgroundLowByte   .rs 1
+backgroundHighByte  .rs 1
+paletteCycleCounter .rs 1
+
+;; Some code...
+
+RESET:
+    ;; Some more code...
+
+    ; Loading 0 to the variable
+    LDA #$00
+    STA paletteCycleCounter 
+
+    ;; Some more code
+```
+
+<sub>**Code Block 15**: Add these 3 lines of code to these sections of `cassette.asm`.</sub>
+
+So, now, just like with the sprite data, we can access the value stored in this variable any time we want.
+
+The steps are now to:
+
+1. Load up the current value of `paletteCycleCounter`.
+2. Switch over to the next palette value (0-3) by adding 1 to it.
+3. If we haven't reached 4 (i.e. `paletteCycleCounter < 4`), change the palette bits of every sprite to match the value of `paletteCycleCounter`. If we _have_ reached 4, we should reset `paletteCycleCounter` to 0.
+
+```asm
+    ; Switch over to the next palette value (0-3)
+    CLC
+    LDA paletteCycleCounter
+    ADC #$01
+    STA paletteCycleCounter
+
+    ; If we haven't reached 4, we can go manipulate the sprite attribute bits
+    CMP #PALETTE_LIM
+    BNE .Cycle
+
+    ; But if we have reached 4, we should reset the counter to 0
+    LDA #$00
+    STA paletteCycleCounter
+.Cycle:
+    LDX #$00
+    LDY #$00
+
+    ; The rest of the A button instructions...
+```
+
+<sub>**Code Block 16**: Cycling through 0, 1, 2, and 3. Here `PALETTE_LIM` has a value of `0`.</sub>
+
+#### ***Manipulating Specific Bits In A Byte***
+
+This part is super fun. Checking for a button press is relatively easy, since we only have to perform an `and` operation against a specific byte. Changing two specific bits, while leaving the other six completely untouched, requires a bit of a finer touch. Nothing we can't handle though.
+
+Our goal is the following: since `paletteCycleCounter` is keeping the value of `00`, `01`, `10`, or `11`, _if we were able to get **bits 1 and 2 to both be zeros**, a exclusive-or (`xor`) operation with the value of `paletteCycleCounter` would do the trick_. So our goal is to, regardless of their current value, get bits 1 and 2 to both be zero:
+
+```
+CSSETTE_ATR ----------> XXXXXX00 | --> XXXXXX01 | --> XXXXXX10 | --> XXXXXX11
+                          ???    |       ???    |       ???    |       ???
+                        ???????? | --> ???????? | --> ???????? | --> ????????
+——————————————————————————————————————————————————————————————————————————————
+result ---------------> XXXXXX00 | --> XXXXXX00 | --> XXXXXX00 | --> XXXXXX00
+```
+
+<sub>**Figure 18**: What operation (`???`)—and using what value as its second operand (`????????`)—will get any permutation of the last two bits to end up being zero?</sub>
+
+One way to do this requires not one, but two simple bitwise operations. 
+
+1. It turns out that it is easy to get any one bit to be `1` by performing an `or` operation on it against a `1`. This gets bits 1 and 2, regardless of whether they are `1` or `0`, to turn to `1`.
+2. From there, we can perform an `xor` operation on that bit against a `1`. Since exclusive-or requires one `true` and one `false`, the result of this operation will be `false`, zeroing out our bit.
+
+```
+CSSETTE_ATR ----------> XXXXXX00 | --> XXXXXX01 | --> XXXXXX10 | --> XXXXXX11
+                           OR    |        OR    |        OR    |        OR
+                        00000011 | --> 00000011 | --> 00000011 | --> 00000011
+———————————————————————————————————————————————————————————————————————————————
+step one -------------> XXXXXX11 | --> XXXXXX11 | --> XXXXXX11 | --> XXXXXX11
+                           XOR   |        XOR   |        XOR   |        XOR
+                        00000011 | --> 00000011 | --> 00000011 | --> 00000011
+———————————————————————————————————————————————————————————————————————————————
+step two -------------> XXXXXX00 | --> XXXXXX00 | --> XXXXXX00 | --> XXXXXX00
+                           XOR   |        XOR   |        XOR   |        XOR
+paletteCycleCounter --> 00000000 | --> 00000001 | --> 00000010 | --> 00000011
+———————————————————————————————————————————————————————————————————————————————
+NEW PALETTE NUMBER ---> XXXXXX00 | --> XXXXXX01 | --> XXXXXX10 | --> XXXXXX11
+```
+
+<sub>**Figure 19**: A surgical bitwise operation; the other bits are never touched!</sub>
+
+The 6502 instructions `ORA` (or) and `EOR` (exclusive-or) can help us here:
+
+```asm
+ReadA:
+    LDA CNTRLRONE
+    AND #%00000001
+    BEQ EndReadA
+
+    ; Switch over to the next palette value (0-3)
+    CLC
+    LDA paletteCycleCounter
+    ADC #$01
+    STA paletteCycleCounter
+
+    ; If we haven't reached 4, we can go manipulate the sprite attribute bits
+    CMP #PALETTE_LIM
+    BNE .Cycle
+
+    ; But if we have reached 4, we should reset the counter to 0
+    LDA #$00
+    STA paletteCycleCounter
+
+.Cycle:
+    LDX #$00
+    LDY #$00
+.ALoop:
+    LDA CSSETTE_ATR,X
+
+    ORA #%00000011          ; turn on both palette bits —> XXXXXX11
+    EOR #%00000011          ; turn off both palette bits -> XXXXXX00
+    EOR paletteCycleCounter ; turn on the current palette (00, 01, 10, or 11)
+    STA CSSETTE_ATR,X
+
+    STA CSSETTE_ATR,X
+
+.AInnerLoop:
+    INX
+    INY
+
+    CPY #$04
+    BNE .AInnerLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .ALoop
+
+EndReadA:
+```
+
+<sub>**Code Block 17**: Our complete A button "handler".</sub>
+
+And lo! We've got our first game mechanic going!
+
+![palette-flipper](assets/images/palette-flipper.gif)
+
+<sub>**Figure 20**: Personally, I think it looks super cute.</sub>
+
+### Part 5: _Conclusion_
+
+If I had to the hobby project that gave me the most grief—and simply because its documentation is so decentralised and obscure—it would be NES development. I think, honestly, that this is a shame. The practice of teaching and learning about concepts like memory management and computer architecture can be enhanced and made fun by simply relating it back to these very real, historical practices. At least, for a lot of us who grew up with video games from the NES, SNES, and even Nintendo 64 era, being this intimately acquainted with the machines that brought us so much joy makes us appreciate them even more.
+
+You will surely have noticed that what I have talked about in this lecture is but a small part of what went into creating this ROM (the complete version can be found [**here**](https://github.com/sebastianromerocruz/CASSETTE.nes)). If you would like to know more about my journey in self-learning NES development, click [**here**](https://github.com/sebastianromerocruz/famicom-6502). Either way, I hope you have enjoyed yourself. Thank you for listening 💜.

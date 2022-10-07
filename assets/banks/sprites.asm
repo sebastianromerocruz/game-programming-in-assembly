@@ -23,7 +23,7 @@ cassetteSprite:
     .db $78, $09, %00000000, $70  ; left
     .db $78, $09, %01000000, $88  ; right
 
-    ; ;; Middle horizontal borders
+    ;; Middle horizontal borders
     .db $70, $0A, %00000000, $78  ; upper left
     .db $70, $0A, %01000000, $80  ; upper right
     .db $80, $0A, %10000000, $78  ; lower left

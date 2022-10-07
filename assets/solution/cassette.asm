@@ -301,7 +301,7 @@ ReadLeft:
     CPX #CASSETTE_SIZE
     BNE .LeftLoop
 
-EndReadLeft
+EndReadLeft:
 
 ReadRight:
     LDA CNTRLRONE

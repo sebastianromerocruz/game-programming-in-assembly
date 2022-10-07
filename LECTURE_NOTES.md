@@ -13,8 +13,8 @@
     1. [**Moving Data Around**](#moving-data-around)
     2. [**Branching And Looping**](#branching-and-looping)
 3. [**Simple Animation**](#part-3-simple-animation)
-4. [**Physics**](#part-4-physics)
-5. [**Controller Input**](#part-5-controller-input)
+4. [**Controller Input**](#part-4-controller-input)
+5. [**Physics**](#part-5-physics)
 
 ### Part 1: _Introduction_
 
@@ -176,7 +176,7 @@ What can we glean from this? `db` simply means "define byte(s)", and is followed
 
 1. Vertical screen position (top left corner)
 2. Graphical tile (hex value of the tile [**in the sprite sheet**](assets/images/sprite-data.png))
-3. Attributes (%76543210):
+3. Attributes (`%76543210`):
     - Bits 0 and 1 are for the colour palette
     - Bits 2, 3, and 4 are not used
     - Bit 5 is priority (0 shows the sprite in front of the background, and 1 displays it behind it)
@@ -300,6 +300,243 @@ Let's see it in action!
 
 <sub>**Figure 16**: Animation in assembly: complete!</sub>
 
-### Part 4: _Physics_
+### Part 4: _Controller Input_
 
-### Part 5: _Controller Input_
+Okay, so we know how to make things move in NES games, but the whole point of video games is having the _player_ make things happen with the controller. Reading for controller input is surprisingly simple when developing for the NES. One simply just has to, every frame:
+
+1. Activate the controller port.
+2. Check if any of the buttons of the NES controller are pressed. This is done in the following order:
+    1. Check if A is pressed.
+    2. Check if B is pressed.
+    3. Check if the start button is pressed.
+    4. Check if the select button is pressed.
+    5. Check if the down button is pressed.
+    6. Check if the left button is pressed.
+    7. Check if the right button is pressed.
+
+That's basically it as far as check for button presses is concerned. The function skeleton in our assembly file, then...
+
+```asm
+ReadControllerInput:
+    ; TODO
+    RTS
+```
+
+Can start to fill up a little. We can activate the controller by loading up the literal value of 1 into the register responsible for controller 1 (`$4016`, which we'll label as `CNTRLRONE` here). However, since the CPU's address bus requires a 16-bit address, we have to "fill out" this activation sequence by loading a 0 into the same address:
+
+```asm
+ReadControllerInput:
+    LDA #$01         ; activate controller by loading 1
+    STA CNTRLRONE    ; into $4016 and
+    LDA #$00         ; "pad" the activation with a 0
+    STA CNTRLRONE    ; since it's a 16-bit address
+```
+
+After the controller is activation, loading the value stored in `CNTRLRONE` again, once for each of the seven button, will let us know if the button was pressed. 
+
+```asm
+ReadControllerInput:
+    LDA #$01         ; activate controller by loading 1
+    STA CNTRLRONE    ; into $4016 and
+    LDA #$00         ; "pad" the activation with a 0
+    STA CNTRLRONE    ; since it's a 16-bit address
+
+    ;; Read button input: A -> B -> Select -> Start -> Up -> Down -> Left -> Right
+    LDA CNTRLRONE   ; A
+    LDA CNTRLRONE   ; B
+    LDA CNTRLRONE   ; Select
+    LDA CNTRLRONE   ; Start
+    LDA CNTRLRONE   ; Up
+    LDA CNTRLRONE   ; Down
+    LDA CNTRLRONE   ; Left
+    LDA CNTRLRONE   ; Right
+```
+
+<sub>**Code Block 8**: Loading either 1 or 0 from each of the button presses—although we are not actually down anything with the result.</sub>
+
+Let's say a 1 is loaded for button A. What does this mean? Here, we introduce one of my favourite things about NES development: bitwise operations.
+
+#### ***Checking For An Active Bit***
+
+The byte loaded from of `CNTRLRONE` either has a 1 at its most significant bit (rightmost, since the 6502 is [**little endian**](https://en.wikipedia.org/wiki/Endianness)) if a specific button is pressed, and a 0 if it isn't pressed. Therefore, we must find a way to check if that bit and only that bit is switched on to 1. For this, we perform an `and` operation with this value against a binary `%00000001`:
+
+```
+CNTRLRONE  --> XXXXXXX0                | --> XXXXXXX1
+                 AND                   |       AND
+BINARY_ONE --> 00000001                | --> 00000001
+---------------------------------------|------------------------
+result     --> XXXXXXX0 (not pressed)  | --> XXXXXXX1 (pressed)
+```
+
+<sub>**Figure 17**:  The two potential results of a bitwise `and` operation on `CNTRLRONE` and (1)<sub>2</sub>, where `X` represents in this case an irrelevant digit.</sub>
+
+Let's handle moving to the right if the player presses the right button first, since we're already aquatinted with the basics of this operation:
+
+```asm
+ReadControllerInput:
+    LDA #$01         ; activate controller by loading 1
+    STA CNTRLRONE    ; into $4016 and
+    LDA #$00         ; "pad" the activation with a 0
+    STA CNTRLRONE    ; since it's a 16-bit address
+
+    ;; Read button input: A -> B -> Select -> Start -> Up -> Down -> Left -> Right
+    LDA CNTRLRONE   ; A
+    LDA CNTRLRONE   ; B
+    LDA CNTRLRONE   ; Select
+    LDA CNTRLRONE   ; Start
+    LDA CNTRLRONE   ; Up
+    LDA CNTRLRONE   ; Down
+    LDA CNTRLRONE   ; Left
+
+ReadRight:
+    LDA CNTRLRONE   ; Right
+
+    ; Translate right
+
+EndReadRight:
+```
+
+To perform an `and` operation, and branch straight to `EndReadRight` if the right button _wasn't_ pressed, we do the following:
+
+```asm
+ReadRight:
+    LDA CNTRLRONE     ; load either a 0 or a 1
+    AND #%00000001    ; AND with binary 1
+    BEQ EndReadRight  ; if we don’t use a CMP operation before BEQ, it will branch if the value is equal to zero
+
+    ; Translate right
+
+EndReadRight:
+```
+
+<sub>**Code Block 9**: This of this as an if-statement checking for a button press that will `return` right away if there wasn't an actual press detected.</sub>
+
+Nice. Now, we perform the same steps to move all of the cassette sprites to the right as we did with the banner:
+
+1. Load the horizontal location of the current sprite, starting at the location of the first sprite in the sequence (in this case, `$0303`, labelled as `CASSETTE_TILE`), offset by the value stored in the x register.
+2. Translate to the right by 1 unit by adding 1 to the loaded value.
+3. Store the incremented value back into the corresponding memory location.
+4. "Skip" four bytes to get to the next sprite's horizontal location until the "cassette size" has been reached.
+
+In code:
+
+```asm
+ReadRight:
+    LDA CNTRLRONE        ; load either a 0 or a 1
+    AND #%00000001       ; AND with binary 1
+    BEQ EndReadRight     ; if we don’t use a CMP operation before BEQ, it will branch if the value is equal to zero
+
+    LDX #$00
+    LDY #$00
+.RightLoop:
+    LDA CASSETTE_TILE,X  ; load the horizontal location of the current sprite
+    
+    CLC
+    ADC #$01             ; translate to the right by 1 unit by adding 1 to the loaded value.
+    STA CASSETTE_TILE,X  ; store the incremented value back into the corresponding memory location.
+
+; "skip" four bytes to get to the next sprite's horizontal location...
+.RightInnerLoop:
+    INX
+    INY
+    CPY #$04
+    BNE .RightInnerLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE    ; ...until the "cassette size" has been reached
+    BNE .RightLoop
+
+EndReadRight:
+```
+
+<sub>**Code Block 10**: Translating to the right _only if_ the right button is pressed.</sub>
+
+Translating to the left is essentially the same exact operation, except we decrement by one instead of incrementing. For vertical movement, our starting memory location is `$0300` (`CASSETTE_STRT`) instead of `CASSETTE_TILE`:
+
+```asm
+ReadUp:
+    LDA CNTRLRONE
+    AND #%00000001
+    BEQ EndReadUp
+
+    LDX #$00
+    LDY #$00
+.UpLoop:
+    LDA CASSETTE_STRT,X
+
+    SEC
+    SBC #$01
+    STA CASSETTE_STRT,X
+
+.InnerUpLoop:
+    INY
+    INX
+    CPY #$04
+    BNE .InnerUpLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .UpLoop
+
+EndReadUp:
+
+ReadDown:
+    LDA CNTRLRONE
+    AND #%00000001
+    BEQ EndReadDown
+
+    LDX #$00
+    LDY #$00
+.DownLoop:
+    LDA CASSETTE_STRT,X
+
+    CLC
+    ADC #$01
+    STA CASSETTE_STRT,X
+
+.InnerDownLoop:
+    INY
+    INX
+    CPY #$04
+    BNE .InnerDownLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .DownLoop
+
+EndReadDown:
+
+ReadLeft:
+    LDA CNTRLRONE
+    AND #%00000001
+    BEQ EndReadLeft
+
+    LDX #$00
+    LDY #$00
+.LeftLoop:
+    LDA CASSETTE_TILE,X
+
+    SEC
+    SBC #$01
+    STA CASSETTE_TILE,X
+
+.InnerLeftLoop: 
+    INX
+    INY
+    CPY #$04
+    BNE .InnerLeftLoop
+
+    LDY #$00
+    CPX #CASSETTE_SIZE
+    BNE .LeftLoop
+
+EndReadLeft:
+```
+
+<sub>**Code Block 11**: Translating upwards, downwards, and to the left _only if_ the their corresponding buttons are pressed. Notice that, in the case of subtraction, we have to _set_ the carry flag instead of clearing it.</sub>
+
+#### Changing Colour Palettes With `and`, `or` And `xor`
+
+Let's do something more interesting now. 
+
+### Part 5: _Physics_

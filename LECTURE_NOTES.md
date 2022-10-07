@@ -141,7 +141,7 @@ This is essentially all we need to know to get started with some simple developm
 
 ### Part 3: _Simple Animation_
 
-If we assemble and run [**cassette.asm**](cassette.asm), we should see the following screen:
+I have included an incomplete version of one of my personal projects for us to work in. If we assemble and run [**cassette.asm**](cassette.asm), we should see the following screen:
 
 ```commandline
 ➜  game-programming-in-assembly git:(main) ✗ make    

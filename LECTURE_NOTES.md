@@ -92,6 +92,8 @@ Loop:
                 ; the code that we want to loop would go here
 
     BNE Loop    ; if x != LIMIT, jump to the Loop label
+
+    LDA #$10
 ```
 
 <sub>**Code Block 2**: The code below the `Loop` label would run four times. Note the use of the X register as our "loop variable".</sub>
@@ -176,7 +178,7 @@ Let's start with getting some basic movement. I would like the "cassette" banner
 
 How are we to accomplish this? 
 
-Elsewhere in the program, the [**data**](assets/banks/sprites.asm) concerning the location and orientation of these sprites was loaded up into a specific location exclusive to sprite data (in this program, the location chosen was `$0300`, which I have given the label `SPRITE_RAM`). Lets take a look at the data of the first letter of `cassette`:
+Elsewhere in the program, the [**data**](assets/banks/sprites.asm) concerning the location and orientation of these sprites was loaded up into a specific location exclusive to sprite data (in this program, the location chosen was `$0300`, which I have given the label `SPRITE_RAM`). Let's take a look at the data of the first letter of `cassette`:
 
 ```asm
     .db $14, $0D, %00000000, $20  ; C
@@ -214,10 +216,10 @@ RotateText:
 .StringLoop:
     INX
 
-    ; TODO - Loading up the data of each specific tile.
-    ; TODO - Accessing each tile's horizontal location sub-data.
-    ; TODO - Increasing its value in the direction that corresponds to the right direction (translation transformation in game programming parlance).
-    ; TODO - Saving the result back into the tile's corresponding location in memory.
+    ; TODO - 1. Loading up the data of each specific tile.
+    ; TODO - 2. Accessing each tile's horizontal location sub-data.
+    ; TODO - 3. Increasing its value in the direction that corresponds to the right direction (translation transformation in game programming parlance).
+    ; TODO - 4. Saving the result back into the tile's corresponding location in memory.
 
     CPX ; TODO - How many times should this loop run?
     BNE .StringLoop
@@ -227,7 +229,7 @@ RotateText:
 
 In 6502, the only register that can perform math operations is the accumulator (A register), so it is always a good idea to use it to do stuff like translations (even if it's just an increment).
 
-We said earlier that the tiles were all saved in memory starting at location `$0300`, right? Now, if the `c` tile were the first tile to have been loaded up, then this would be the location that we would load. But the `c` tile is actually the 14th tile to be saved into memory, so its starting location is actually at memory location `$0333`. Let's apply the label `STRNG_STRT` to this location for convenient:
+We said earlier that the tiles were all saved in memory starting at location `$0300`, right? Now, if the `c` tile were the first tile to have been loaded up, then this would be the location that we would load. But the `c` tile is actually the 14th tile to be saved into memory, so its starting location is actually at memory location `$0333`. Let's apply the label `STRNG_STRT` to this location for convenience:
 
 ```
     STRNG_STRT
@@ -347,7 +349,7 @@ ReadControllerInput:
     STA CNTRLRONE    ; since it's a 16-bit address
 ```
 
-After the controller is activated, loading the value stored in `CNTRLRONE` again, once for each of the seven button, will let us know if the button was pressed. 
+After the controller is activated, loading the value stored in `CNTRLRONE` again, once for each of the seven buttons, will let us know if the button was pressed. 
 
 ```asm
 ReadControllerInput:
@@ -590,7 +592,7 @@ Remember the third byte from earlier?
     - Bit 6 flips the tile horizontally (0 is normal, 1 is flipped)
     - Bit 7 flips the tile vertically (0 is normal, 1 is flipped)
 
-The two most significant (rightmost) bits correspond to the palette being used to colour the tile. The 6502 allows for up to four palettes to be assigned to a particular sprite (i.e. `00` for palette 1, `01` for palette 2, `10` for palette 3, and `11` for palette 4). So, in code block 12, we can see that all tiles are currently using colour palette 1 (`00`).
+The two most significant (rightmost) bits correspond to the palette being used to colour the tile. The 6502 allows for up to four palettes to be assigned to a particular sprite (i.e. (0)<sub>2</sub> for palette 1, (1)<sub>2</sub> for palette 2, (2)<sub>2</sub> for palette 3, and (3)<sub>2</sub> for palette 4). So, in code block 12, we can see that all tiles are currently using colour palette 1 (`01`, or (1)<sub>2</sub>)).
 
 How about we try to do this: every time the player clicks on the A-button, the palette being applied to the tiles will rotate between the four available palettes. We can even think of this is as a game mechanic; maybe every palette represents a different power-up our cassette protagonist can use. 
 

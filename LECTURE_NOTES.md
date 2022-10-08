@@ -44,19 +44,19 @@ Fundamentally speaking, all assembly programming is about is the transfer of num
 
 In 6502, we have different forms of using values–a process known as _addressing_. The two forms of addressing that we need to be aware of are:
 
-- **Immediate Addressing**: Preceded by a `#`, these values are literals used directly to perform computations.
-- **Absolute Addressing**: A full 16-bit address is specified and the byte at that address is used to perform a computation.
+- **Immediate Addressing**: Preceded by a `#`, these values are literals used directly to perform computations. That is, if you want to load up any plain old number, this is what you would use.
+- **Absolute Addressing**: A full 16-bit address is specified and the byte at that address is used to perform a computation. That is, you are not using the value you are addressing, but rather the number stored at that memory location.
 
 With this in mind, take a look at the following lines of code:
 
 ```asm
-    LDA #$10   ; load hex 10 into accumulator
-    STA $2007  ; store the value of accumulator to location 2007
+    LDA #$10   ; immediate addressing–load hex 10 into accumulator
+    STA $2007  ; absolute addressing–store the value of accumulator to location 2007
 ```
 
 <sub>**Code Block 1**: Note that, similar to many modern assembly languages, instructions are preceded by a tab of whitespace.</sub>
 
-Here, we are loading the hex number 10 to the A register, or the accumulator. In the 6502, we have three general purpose registers that we can use for operations: A, X, and Y.
+Here, we are loading the hex number 10 and then storing it in the A register, or the accumulator. In the 6502, we have three general purpose registers that we can use for operations: A, X, and Y.
 
 In 6502 assembly, hexadecimal values are preceded by a `$`, and binary values by `%`. `%00000001` is, for example, (1)<sub>2</sub>.
 
@@ -76,6 +76,9 @@ Looks good.
 Now, we need a way to automate these operations. In high-level programming languages, this would be the job of a `while`- or a `for`-loop. We don't have such control-flow structures in assembly, so instead we must manually tell the program to return to an earlier point in our program if a certain condition is true. This is known as **branching**. For this, we can make use of either of the following 6502 instructions:
 
 - **`CMP`/ `CPY` / `CPX` (compare with accumulator / Y register / X register)**: Compares the current value stored inside the accumulator / Y register / X register with another.
+
+After we make a comparison, we can use either of the following to branch depending on the result:
+
 - **`BNE` (branch on not equal)**: Go to a certain location in the program, denoted by a label, if the result of a comparison is false.
 - **`BEQ` (branch on equal)**: Go to a certain location in the program, denoted by a label, if the result of a comparison is true.
 
@@ -86,19 +89,19 @@ LIMIT = $04     ; we can assign labels to addresses
 
     LDX #$00    ; x = 0
 Loop:
-    INX  ; x++
+    INX         ; x++
     CPX #LIMIT  ; x == LIMIT
 
                 ; the code that we want to loop would go here
 
     BNE Loop    ; if x != LIMIT, jump to the Loop label
 
-    LDA #$10
+    LDA #$10    ; this line of code will only run after the loop is over
 ```
 
 <sub>**Code Block 2**: The code below the `Loop` label would run four times. Note the use of the X register as our "loop variable".</sub>
 
-Let's run this code in our virtual assembler and load a number into the accumulator _after_ the loop is done as a sanity check. This should only happen if the loop has ended:
+Let's run this code in our virtual assembler and load a number into the accumulator _after_ the loop is done as a sanity check:
 
 ![loop-1](assets/images/loop-1.png)
 ![loop-2](assets/images/loop-2.png)
@@ -110,7 +113,9 @@ Let's run this code in our virtual assembler and load a number into the accumula
 
 <sub>**Figures 5 – 11**: The emulated result of the assembly and running code block 2. Notice that, as figure 11 shows, (10)<sub>16</sub> isn't loaded into the accumulator until after the loop is through. This can be used for sentinel control (i.e. a `while`-loop).</sub>
 
-So, if we used one of our three registers to create one loop, how would we create a nested loop? Repeat the exact same process with the other two registers!
+So, if we used one of our three registers to create one loop.
+
+Since we have two other registers, we can use them to create a nested loop. This operation is super common in NES dev, as we shall see. Let's add a literal 2 to the accumulator inside the inner loop to demonstrate:
 
 ```asm
 INNER = $04
@@ -147,7 +152,9 @@ This is essentially all we need to know to get started with some simple developm
 
 ### Part 3: _Simple Animation_
 
-I have included an incomplete version of one of my personal projects for us to work in. If we assemble and run [**cassette.asm**](cassette.asm), we should see the following screen:
+I have included an incomplete version of one of my personal projects for us to work in.
+
+If we assemble (`make` in the command line`) and run [**cassette.asm**](cassette.asm) `make run` in the command line`), we should see the following screen:
 
 ```commandline
 ➜  game-programming-in-assembly git:(main) ✗ make    
@@ -161,7 +168,7 @@ open cassette.nes -a nestopia
 ```
 ![static](assets/images/static.png)
 
-<sub>**Figure 13**: A nice cassette sprite, along with a banner with the word "cassette", doing absolutely nothing on screen.</sub>
+<sub>**Figure 13**: A nice cassette sprite, along with a banner with the word "cassette", doing absolutely nothing on screen. Keep in mind that you will need to have [**nestopia**](https://nestopia.sourceforge.net/), and NES emulator, for these commands to work.</sub>
 
 The spritesheet that went into this design can be seen below:
 
@@ -171,32 +178,29 @@ The spritesheet that went into this design can be seen below:
 
 Let's start with getting some basic movement. I would like the "cassette" banner to move constantly to the right and loop around to the left of the screen, as if it were a stock market signboard. This would imply a couple of things:
 
-1. Loading up the data of each specific tile.
-2. Accessing each tile's horizontal location sub-datum.
+1. Loading up the data of each specific tile (i.e. the `c` tile, the `a` tile, etc).
+2. Accessing the portion of each tile's data that contains its horizontal location.
 3. Increasing its value in the direction that corresponds to the right direction (translation transformation in game programming parlance).
 4. Saving the result back into the tile's corresponding location in memory.
 
 How are we to accomplish this? 
 
-Elsewhere in the program, the [**data**](assets/banks/sprites.asm) concerning the location and orientation of these sprites was loaded up into a specific location exclusive to sprite data (in this program, the location chosen was `$0300`, which I have given the label `SPRITE_RAM`). Let's take a look at the data of the first letter of `cassette`:
+Elsewhere in the program, the [**data**](assets/banks/sprites.asm) concerning the location and orientation of these sprites was loaded up into a specific location exclusive to sprite data (in this program, the location chosen was `$0300`, which I have given the label `SPRITE_RAM`). 
+
+Let's take a look at the data of the first letter of `cassette`:
 
 ```asm
     .db $14, $0D, %00000000, $20  ; C
 ```
 
-What can we glean from this? `db` simply means "define byte(s)", and is followed by four bytes corresponding to the `c` sprite. Each sprite consists, then, of 4 bytes of data:
+What can we glean from this? `.db` simply means "define byte(s)", and is followed by four bytes corresponding to the `c` sprite. Each sprite consists, then, of 4 bytes of data:
 
 1. Vertical screen position (top left corner)
 2. Graphical tile (hex value of the tile [**in the sprite sheet**](assets/images/sprite-data.png))
-3. Attributes (`%76543210`):
-    - Bits 0 and 1 are for the colour palette
-    - Bits 2, 3, and 4 are not used
-    - Bit 5 is priority (0 shows the sprite in front of the background, and 1 displays it behind it)
-    - Bit 6 flips the sprite horizontally (0 is normal, 1 is flipped)
-    - Bit 7 flips the sprite vertically (0 is normal, 1 is flipped)
+3. Attributes (more on this in the next section)
 4. Horizontal screen position (top left corner)
 
-Awesome, so it looks like byte number 4 is our ticket forwards. Inside [**cassette.asm**](cassette.asm), locate the following label, which is where we will program our banner movement:
+Awesome, so it looks like byte number 4 is our ticket forwards. Inside [**cassette.asm**](cassette.asm), locate the following label, which is where we will program our banner "movement":
 
 ```asm
 RotateText:
@@ -227,9 +231,11 @@ RotateText:
 
 <sub>**Code Block 5**: Here, the `.` before `StringLoop` denotes that it is a section belonging to the `RotateText` subroutine. Consider it an inner subroutine inside `RotateText`'s scope.</sub>
 
-In 6502, the only register that can perform math operations is the accumulator (A register), so it is always a good idea to use it to do stuff like translations (even if it's just an increment).
+In 6502, **the only register that can perform math operations is the accumulator (A register)**, (although the X and Y register can perform increments of 1 using `INX` and `INY`) so it is always a good idea to use it to do stuff that involves math (even if it's just an increment by 1).
 
-We said earlier that the tiles were all saved in memory starting at location `$0300`, right? Now, if the `c` tile were the first tile to have been loaded up, then this would be the location that we would load. But the `c` tile is actually the 14th tile to be saved into memory, so its starting location is actually at memory location `$0333`. Let's apply the label `STRNG_STRT` to this location for convenience:
+We said earlier that the tiles were all saved in memory, starting at location `$0300`, right? Now, if the `c` tile were the first tile to have been loaded up, then this would be the location that we would start loading from. But the `c` tile is actually the 14th tile to be saved into memory, so its starting location is actually at memory location `$0333`. 
+
+Let's apply the label `STRNG_STRT` to this location for convenience. Visually, you can think of it looking like this:
 
 ```
     STRNG_STRT
@@ -241,12 +247,18 @@ We said earlier that the tiles were all saved in memory starting at location `$0
         |
         S1 ––– S2 ––– S3 ––– S4
                               |
+        S4 ––– S3 ––– S2 ––– S1
+        |
+        E1 ––– E2 ––– E3 ––– E4
+                              |
         T4 ––– T3 ––– T2 ––– T1
         |
-        E1 ––– E2 ––– E3 ––– E4 ––– ...
+        T1 ––– T2 ––– T3 ––– T4
+                              |
+... ––– E4 ––– E3 ––– E2 ––– E1
 ```
 
-<sub>**Figure 15**: A visualisation of how each of the four bytes dedicated to each letter are stored in memory–contiguously (that is, stored right next to each other in memory).</sub>
+<sub>**Figure 15**: A visualisation of how each of the four bytes dedicated to each letter are stored in memory–contiguously (that is, stored right next to each other in memory). `1` corresponds to the vertical position byte, `2` corresponds to the the tile byte, `3` the attributes byte, and `4` the horizontal position byte.</sub>
 
 6502 assembly has this gnarly way of addressing data that is contiguous called **absolute indexed** addressing. This effectively means that we can offset which location we are accessing by a certain index. For example, if we wanted to load the value stored 3 bytes away from location `$0100`, we would do the following:
 
@@ -254,34 +266,38 @@ We said earlier that the tiles were all saved in memory starting at location `$0
     LDA $0100,#$03
 ```
 
-This is perfect for our needs, since we know our starting point. We can also figure out the amount of times this loop will run with some simple math. If there are 8 letters in the word "cassette", and each letter comprises for 4 bytes, then the "size" of this tile string is 8 × 4 = (32)<sub>10</sub> = (20)<sub>16</sub>. Let's call this value `STRNG_SIZE`:
+This is perfect for our needs, since we know our starting point, `STRNG_STRT`. 
+
+We can also figure out the amount of times this loop will run with some simple math. If there are 8 letters in the word "cassette", and each letter comprises for 4 bytes, then the "size" of this tile string is 8 × 4 = (32)<sub>10</sub> = (20)<sub>16</sub>.
+
+Let's call this value `STRNG_SIZE`:
 
 ```asm
 RotateText:
-    LDX #$00 ; x = 0
+    LDX #$00          ; x = 0
 .StringLoop:
     LDA STRNG_STRT,X  ; Load the location of (0th + x)th letter
 
     ; TODO - Increment value in the direction that corresponds to the right direction (translation transformation in game programming parlance).
     ; TODO - Saving the result back into the tile's corresponding location in memory.
 
-    INX              ; x++
+    INX               ; x++
 
-    CPX #STRNG_SIZE  ; Once x == STRNG_SIZE, stop
+    CPX #STRNG_SIZE   ; Once x == STRNG_SIZE, stop
     BNE .StringLoop
 
     RTS
 ```
 
-<sub>**Code Block 6**: Here, we are offsetting the location `LDA` is loading by the current value stored in the x register.</sub>
+<sub>**Code Block 6**: Here, we are offsetting the location that `LDA` is loading by the current value stored in the X register.</sub>
 
-Speaking of offsets, we have a bit of a problem here. `INX` is incrementing the value stored in the x register by 1. Now, this would be great if every tile's horizontal location byte were located right next to each other, but as we can see in figure 15, this is not the case. A tile's fourth byte contains the horizontal location, but it is then followed by the 3 more bytes of information before we reach the next tile's horizontal location byte.
+Speaking of offsets, we have a bit of a problem here. `INX` is incrementing the value stored in the x register by 1. Now, this would be fine if every tile's horizontal location byte were located right next to each other, but as we can see in figure 15, this is not the case. A tile's fourth byte contains the horizontal location, but it is then followed by the 3 more bytes of information before we reach the next tile's horizontal location byte.
 
-Meaning: we have to increment not by 1, but by 4. The problem here is that the only register in the 6502 microprocessor that is able to perform arithmetic and / or be offset by a value is the accumulator, so we can't simply just add 4 to the x register. 
+Meaning: we have to increment not by 1, but by 4. The problem here, again, is that the only register in the 6502 microprocessor that is able to perform arithmetic and / or be offset by a value is the accumulator, so we can't simply just add 4 to the X register. 
 
-It was when I first faced this limitation that I really started to feel the limitations of the 6502 assembly language, but it need not be a bad thing. Working with limitations is how we get creative, and in this case, the solution is not too far out.
+Honestly, it was when I first faced this dilemma that I really started to feel the limitations of the 6502 assembly language, but it need not be a bad thing. Working with limitations is how we get creative, and in this case, the solution is not too far out.
 
-Instead of adding 4 to the x register in one go, let's add 1 to it four times. In other words, we need another loop inside of our main loop:
+Instead of adding 4 to the X register in one go, let's add 1 to it four times. In other words, we need another loop inside of our main loop:
 
 ```asm
 RotateText:
@@ -319,7 +335,9 @@ Let's see it in action!
 
 ### Part 4: _Controller Input_
 
-Okay, so we know how to make things move in NES games, but the whole point of video games is having the _player_ make things happen with the controller. Reading for controller input is surprisingly simple when developing for the NES. One simply just has to, every frame:
+Okay, so we know how to make things move in NES games.
+
+But the whole point of video games is having the _player_ make things happen with the controller–that's what makes them _games_. Reading for controller input is surprisingly simple when developing for the NES. One simply just has to, every frame:
 
 1. Activate the controller port.
 2. Check if any of the buttons of the NES controller are pressed. This is done in the following order:
@@ -339,7 +357,9 @@ ReadControllerInput:
     RTS
 ```
 
-This can start to fill up a little. We can activate the controller by loading up the literal value of 1 into the register responsible for controller 1 (`$4016`, which we'll label as `CNTRLRONE` here). However, since the CPU's address bus requires a 16-bit address, we have to "fill out" this activation sequence by loading a 0 into the same address:
+We can start to fill this up a little. We can activate the controller by loading up the literal value of 1 into the register responsible for controller 1 (`$4016`, which we'll label as `CNTRLRONE` here). 
+
+However, since the CPU's address bus requires that we give it a 16-bit address, we have to "fill out" this activation sequence by loading a 0 into the same address (`#$01` is a four-bit value):
 
 ```asm
 ReadControllerInput:
@@ -371,7 +391,7 @@ ReadControllerInput:
     RTS
 ```
 
-<sub>**Code Block 8**: Loading either 1 or 0 from each of the button presses—although we are not actually down anything with the result.</sub>
+<sub>**Code Block 8**: Loading either 1 or 0 from each of the button presses—although we are not actually doing anything with the result.</sub>
 
 So, how exactly do we activate a button? Here, we introduce one of my favourite things about NES development: bitwise operations.
 
@@ -415,7 +435,9 @@ ReadRight:
 EndReadRight:
 ```
 
-To perform an `and` operation, and branch straight to `EndReadRight` if the right button _wasn't_ pressed, we do the following:
+Think of `EndReadRight` as the label we'll just straight to if the button wasn't pressed.
+
+To perform an `and` operation, we do the following:
 
 ```asm
 ReadRight:
@@ -583,7 +605,7 @@ Let's do something more interesting now. Remember the four bytes associated to e
 
 <sub>**Code Block 12**: Data bank for the tiles that comprise our cassette sprite.</sub>
 
-Remember the third byte from earlier?
+Remember the third byte from earlier? I previously called it the "attribute" byte, and it is typically written in binary, since each of its bits are themselves flags:
 
 3. Attributes (`%76543210`):
     - Bits 0 and 1 are for the colour palette
@@ -592,7 +614,7 @@ Remember the third byte from earlier?
     - Bit 6 flips the tile horizontally (0 is normal, 1 is flipped)
     - Bit 7 flips the tile vertically (0 is normal, 1 is flipped)
 
-The two most significant (rightmost) bits correspond to the palette being used to colour the tile. The 6502 allows for up to four palettes to be assigned to a particular sprite (i.e. (0)<sub>2</sub> for palette 1, (1)<sub>2</sub> for palette 2, (2)<sub>2</sub> for palette 3, and (3)<sub>2</sub> for palette 4). So, in code block 12, we can see that all tiles are currently using colour palette 1 (`01`, or (1)<sub>2</sub>)).
+The two most significant (rightmost) bits correspond to the palette currently being used to colour the tile. The 6502 allows for up to four palettes to be assigned to a particular sprite (i.e. (0)<sub>2</sub> for palette 1, (1)<sub>2</sub> for palette 2, (2)<sub>2</sub> for palette 3, and (3)<sub>2</sub> for palette 4). So, in code block 12, we can see that all tiles are currently using colour palette 1 (`01`, or (1)<sub>2</sub>)).
 
 How about we try to do this: every time the player clicks on the A-button, the palette being applied to the tiles will rotate between the four available palettes. We can even think of this is as a game mechanic; maybe every palette represents a different power-up our cassette protagonist can use. 
 
@@ -617,7 +639,7 @@ ReadA:
     INX
     INY
 
-    CPY #CHAR_GAP
+    CPY #$04
     BNE .AInnerLoop
 
     LDY #$00
@@ -636,10 +658,6 @@ What we would like to do first is to store, somewhere in memory, a value that te
 Sure can. Close to the top of our `asm` file you will find a section where I am creating the variables necessary for this code to run the way it does at the moment:
 
 ```asm
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Variables                                                                                           ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
     .rsset VARLOC
 music               .rs 16
 backgroundLowByte   .rs 1
@@ -651,10 +669,6 @@ backgroundHighByte  .rs 1
 Let's add one more variable here to keep track of our current palette value, and initialise it to 0 (i.e. `00`):
 
 ```asm
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Variables                                                                                           ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
     .rsset VARLOC
 music               .rs 16
 backgroundLowByte   .rs 1
@@ -691,7 +705,7 @@ The steps are now to:
     STA paletteCycleCounter
 
     ; If we haven't reached 4, we can go manipulate the sprite attribute bits
-    CMP #PALETTE_LIM
+    CMP #$04
     BNE .Cycle
 
     ; But if we have reached 4, we should reset the counter to 0
@@ -706,11 +720,13 @@ The steps are now to:
 
 <sub>**Code Block 16**: Cycling through 0, 1, 2, and 3. Here `PALETTE_LIM` has a value of `0`.</sub>
 
-Cool, so that's step 1. Now we need to actually apply the current value of `paletteCycleCounter` to the tiles' attribute byte. How are we going to do this?
+Cool, so that's step 1. 
+
+Now we need to actually apply the current value of `paletteCycleCounter` to the tiles' attribute byte. How are we going to do this?
 
 #### ***Manipulating Specific Bits In A Byte***
 
-This part is super fun. Checking for a button press is relatively easy, since we only have to perform an `and` operation against a specific byte. Changing two specific bits, while leaving the other six completely untouched, requires a bit of a finer touch. Nothing we can't handle though.
+This part is super fun. Checking for a button press was relatively easy, right? We only had to perform an `and` operation against a specific byte. Changing two specific bits, while leaving the other six completely untouched, requires a bit of a finer touch. Nothing we can't handle though.
 
 Our goal is the following: since `paletteCycleCounter` is keeping the value of `00`, `01`, `10`, or `11`, _if we were able to get **bits 0 and 1 to both be zeros**, an exclusive-or (`xor`) operation with the value of `paletteCycleCounter` would get them into the appropriate values_. So our goal is to, regardless of their current value, get bits 1 and 2 to both be zero:
 
@@ -719,7 +735,7 @@ CSSETTE_ATR ----------> XXXXXX00 | --> XXXXXX01 | --> XXXXXX10 | --> XXXXXX11
                           ???    |       ???    |       ???    |       ???
                         ???????? | --> ???????? | --> ???????? | --> ????????
 ——————————————————————————————————————————————————————————————————————————————
- ---------------------> XXXXXX00 | --> XXXXXX00 | --> XXXXXX00 | --> XXXXXX00
+                        XXXXXX00 | --> XXXXXX00 | --> XXXXXX00 | --> XXXXXX00
                            XOR   |        XOR   |        XOR   |        XOR
 paletteCycleCounter --> 00000000 | --> 00000001 | --> 00000010 | --> 00000011
 ———————————————————————————————————————————————————————————————————————————————

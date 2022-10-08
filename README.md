@@ -24,6 +24,7 @@ The following lecture will cover the three basic game design principles of **ani
 This lecture is designed to be actively followed by any who wish to write code along with the professor. For those interested in following the examples included in the lecture, feel free to use the following online tools:
 
 - [**6502 Virtual Assembler**](https://www.masswerk.at/6502/assembler.html)
+- [**nestopia**](https://nestopia.sourceforge.net/) NES emulator
 - [**6502 Assembly Instruction Set**](https://www.masswerk.at/6502/6502_instruction_set.html)
 - [**NES Sprite Editor**](https://eonarheim.github.io/NES-Sprite-Editor/)
 

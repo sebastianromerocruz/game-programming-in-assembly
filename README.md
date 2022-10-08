@@ -15,16 +15,13 @@ The following lecture will cover the three basic game design principles of **ani
 
 1. **Assembly Operations**: Loops
 2. **Simple Animation**: Sprite Movement
-3. **Physics**: Storing and Loading States
-4. **Controller Input**: Bitwise Operations
+3. **Controller Input**: Bitwise Operations
 
 <sub>[***Lecture Notes***](LECTURE_NOTES.md)</sub>
 
 ### **Materials**
 
-This lecture is designed to be actively followed by any who wish to write code along with the professor. For those interested in following the examples included in the lecture, feel free to download the starting materials (will be uploaded shortly before the beginning of the lecture) from [**this Google Drive folder**](https://drive.google.com/drive/folders/1nudoX785eN5eIYb2iIb-FhAEvBgaj6ie?usp=sharing).
-
-Online tools that will be used during the lecture are listed below:
+This lecture is designed to be actively followed by any who wish to write code along with the professor. For those interested in following the examples included in the lecture, feel free to use the following online tools:
 
 - [**6502 Virtual Assembler**](https://www.masswerk.at/6502/assembler.html)
 - [**6502 Assembly Instruction Set**](https://www.masswerk.at/6502/6502_instruction_set.html)

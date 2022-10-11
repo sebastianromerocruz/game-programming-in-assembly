@@ -37,6 +37,7 @@
 music               .rs 16
 backgroundLowByte   .rs 1
 backgroundHighByte  .rs 1
+paletteCycleCounter .rs 1
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Reset                                                                                               ;;
@@ -65,6 +66,7 @@ RESET:
     STX DELMODADDR
 
     LDA #$00
+    STA paletteCycleCounter
     
     ;; Vertical blanks and memory clear (see macros.asm)
     CLEARMEM    

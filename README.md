@@ -1,6 +1,6 @@
 <h2 align=center>October 13th, 2022</h2>
 
-<h1 align=center><em>Nintendo Entertainment System</em>: Game Programming in Assembly</h1>
+<h1 align=center><em>Nintendo Entertainment System:</em> Game Programming in Assembly</h1>
 
 <h3 align=center>Sebastián Romero Cruz</h3>
 <p align=center><sup><em>(they / them)</em></sup></p>

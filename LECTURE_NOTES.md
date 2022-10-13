@@ -152,7 +152,7 @@ This is essentially all we need to know to get started with some simple developm
 
 I have included an incomplete version of one of my personal projects for us to work in.
 
-If we assemble (`make` in the command line`) and run [**cassette.asm**](cassette.asm) `make run` in the command line`), we should see the following screen:
+If we assemble (`make` in the command line) and run [**cassette.asm**](cassette.asm) `make run` in the command line`), we should see the following screen:
 
 ```commandline
 ➜  game-programming-in-assembly git:(main) ✗ make    

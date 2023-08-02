@@ -54,9 +54,7 @@ With this in mind, take a look at the following lines of code:
 
 <sub>**Code Block 1**: Note that, similar to many modern assembly languages, instructions are preceded by a tab of whitespace.</sub>
 
-Here, we are loading the hex number 10 and then storing it in the A register, or the accumulator. In the 6502, we have three general purpose registers that we can use for operations: A, X, and Y.
-
-In 6502 assembly, hexadecimal values are preceded by a `$`, and binary values by `%`. `%00000001` is, for example, (1)<sub>2</sub>.
+Here, we are loading the hex number 10 and then storing it in the A register, or the accumulator (in 6502 assembly, hexadecimal values are preceded by a `$`, and binary values by `%`. `%00000001` is, for example, (1)<sub>2</sub>). In the 6502, we have three general purpose registers that we can use for operations: A, X, and Y.
 
 If we take a look at the result of this operation in our virtual assembler:
 

@@ -6,7 +6,7 @@
 <h3 align=center>Sebastián Romero Cruz</h3>
 <p align=center><sup><em>(they / them)</em></sup></p>
 
-***Song of the day***: _[**Life During Wartime**](https://youtu.be/jLwZvg46jms) by Talking Heads (2022)._
+***Song of the day***: _[**Life During Wartime**](https://youtu.be/jLwZvg46jms) by Talking Heads (1979)._
 
 ### Sections
 
@@ -61,7 +61,7 @@ Being rather old and with spotty online documentation, previous knowledge of the
 
 Having received their undergraduate degree in chemical and biomolecular engineering and their graduate degree in computer science, they encourage a multi-faceted, inclusive approach to programming pedagogy. This policy, combined with a philosophy of complete and unconditional empathy for students of varying backgrounds and needs, are the means through which their courses are administered.
 
-Outside of computer science, Prof. Romero Cruz enjoys learning about French history and impressionism, playing music, and studying the Japanese language.
+Outside of computer science, Prof. Romero Cruz enjoys learning about history and art, playing music, and studying Japanese and Czech.
 
 ---
 
